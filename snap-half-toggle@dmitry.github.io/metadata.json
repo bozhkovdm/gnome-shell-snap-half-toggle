@@ -1,0 +1,10 @@
+{
+  "uuid": "snap-half-toggle@dmitry.github.io",
+  "name": "Snap Half Toggle",
+  "description": "Snap the focused window to the left or right half of its monitor. One hotkey toggles between left and right.",
+  "version": 1,
+  "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.snap-half-toggle",
+  "url": "https://github.com/dmitry/snap-half-toggle",
+  "license": "GPL-3.0-or-later"
+}

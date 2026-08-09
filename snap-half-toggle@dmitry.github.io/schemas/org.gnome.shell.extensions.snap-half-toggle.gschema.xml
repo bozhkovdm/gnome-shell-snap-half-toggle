@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.snap-half-toggle" path="/org/gnome/shell/extensions/snap-half-toggle/">
+    <key type="as" name="toggle-snap">
+      <default><![CDATA[['<Super>w']]]></default>
+      <summary>Toggle snap to half</summary>
+      <description>Snap the focused window to the left or right half of its monitor. Pressing again on a left-snapped window snaps it to the right; otherwise snaps to the left.</description>
+    </key>
+  </schema>
+</schemalist>
