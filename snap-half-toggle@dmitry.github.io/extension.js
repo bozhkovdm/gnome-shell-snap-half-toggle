@@ -54,5 +54,6 @@ export default class SnapHalfToggleExtension extends Extension {
         const targetH = work.height;
 
         win.move_resize_frame(false, targetX, targetY, targetW, targetH);
+        win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
     }
 }
