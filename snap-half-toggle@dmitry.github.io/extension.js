@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 
@@ -7,14 +8,19 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 const KEY = 'toggle-snap';
 const THRESHOLD = 5;
 
+const KEY_LEFT = 105;
+const KEY_RIGHT = 106;
+const KEY_LEFTMETA = 125;
+
 export default class SnapHalfToggleExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
+        this._createVirtualKeyboard();
         Main.wm.addKeybinding(
             KEY,
             this._settings,
             Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
-            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+            Shell.ActionMode.NORMAL,
             () => this._toggle());
     }
 
@@ -23,6 +29,38 @@ export default class SnapHalfToggleExtension extends Extension {
             Main.wm.removeKeybinding(KEY);
             this._settings = null;
         }
+        if (this._virtualDevice) {
+            this._virtualDevice.run_dispose();
+            this._virtualDevice = null;
+        }
+    }
+
+    _createVirtualKeyboard() {
+        const seat = global.stage.context.get_backend().get_default_seat();
+        if (!seat || typeof seat.create_virtual_device !== 'function')
+            return;
+        try {
+            this._virtualDevice =
+                seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        } catch (e) {
+            console.debug('Virtual keyboard device unavailable', e);
+        }
+    }
+
+    _sendKey(keycode, pressed) {
+        if (!this._virtualDevice)
+            return;
+        this._virtualDevice.notify_key(
+            Clutter.get_current_event_time() * 1000,
+            keycode,
+            pressed ? Clutter.KeyState.PRESSED : Clutter.KeyState.RELEASED);
+    }
+
+    _pressSuperArrow(arrowKeycode) {
+        this._sendKey(KEY_LEFTMETA, true);
+        this._sendKey(arrowKeycode, true);
+        this._sendKey(arrowKeycode, false);
+        this._sendKey(KEY_LEFTMETA, false);
     }
 
     _pickWindow() {
@@ -45,15 +83,7 @@ export default class SnapHalfToggleExtension extends Extension {
         const work = win.get_work_area_for_monitor(monitorIdx);
         const frame = win.get_frame_rect();
 
-        const halfW = Math.floor(work.width / 2);
         const atLeft = Math.abs(frame.x - work.x) <= THRESHOLD;
-
-        const targetX = atLeft ? work.x + halfW : work.x;
-        const targetY = work.y;
-        const targetW = halfW;
-        const targetH = work.height;
-
-        win.move_resize_frame(false, targetX, targetY, targetW, targetH);
-        win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
+        this._pressSuperArrow(atLeft ? KEY_RIGHT : KEY_LEFT);
     }
 }

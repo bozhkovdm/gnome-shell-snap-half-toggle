@@ -1,11 +1,11 @@
 # AGENTS.md — snap-half-toggle
 
-Расширение GNOME Shell: по хоткею прижимает активное окно к левой или правой половине экрана, попеременно.
+Расширение GNOME Shell: по хоткею прижимает активное окно к левой или правой половине экрана, попеременно, через **нативный tile** (`Super+Left`/`Super+Right`). Два прижатых к разным сторонам окна образуют нативную пару — ресайз одного тянет второе.
 
 - **UUID**: `snap-half-toggle@dmitry.github.io`
 - **Целевая версия GNOME Shell**: 50.x (тестируется на 50.4)
 - **Лицензия**: GPL-3.0-or-later
-- **Язык**: GJS (JavaScript + `imports.gi`)
+- **Язык**: GJS (JavaScript, ES-модули, импорты через `gi://`)
 
 ## Поведение
 
@@ -15,9 +15,13 @@
 2. Определить монитор окна (а не глобальный `primaryMonitor`).
 3. Взять `workArea` этого монитора (без панелей и дока).
 4. Сравнить `frame.x` окна с `workArea.x`:
-   - если `|frame.x − workArea.x| <= THRESHOLD` (≤ 5 px) → прижать к **правой** половине;
-   - иначе → прижать к **левой** половине.
-5. Прижать — это выставить `frame` равным соответствующей половине `workArea` по X и ширине; затем вызвать `Meta.Window.set_maximize_flags(Meta.MaximizeFlags.VERTICAL)` — окно становится в полную высоту монитора (панель рисуется поверх), WM-флаг `MAXIMIZED_VERTICALLY` выставлен, текущие bounds сохранены как `unmaximize bounds`. **В Mutter 18 `Meta.Window.maximize()` принимает 0 аргументов и выставляет оба флага (BOTH) — для вертикальной максимизации нужно вызывать `set_maximize_flags(Meta.MaximizeFlags.VERTICAL)`. Методы `maximize_vertically` / `maximize_horizontally` / `tile` / `untile` / `toggle_tiled_*` объявлены в typelib, но не забиндены в GJS — падают с `TypeError`.**
+   - если `|frame.x − workArea.x| <= THRESHOLD` (≤ 5 px) → послать **`Super+Right`**;
+   - иначе → послать **`Super+Left`**.
+5. Клавиши инжектятся через **виртуальную клавиатуру** (`Clutter.Seat.create_virtual_device` + `notify_key` с evdev-кодами — см. вывод #10). Дальше мутер сам обрабатывает `Super+Left`/`Super+Right` (это его биндинги `toggle-tiled-left/right` в `org.gnome.mutter.keybindings`) → вызывается нативный `meta_window_tile()`:
+   - окно получает **настоящий tile-статус** (`tile_mode` LEFT/RIGHT, `tile_hfraction` = 0.5), вертикальную максимизацию (полная высота, панель рисуется поверх), снап-анимацию и edge-constraints;
+   - главное: mutter сам формирует **пару** (`tile_match`) с окном, прижатым к другой половине того же монитора — ресайз одного окна автоматически тянет второе, ровно как после ручных `Super+Left`+`Super+Right`.
+
+Направление всегда противоположно текущей позиции окна, поэтому нативный toggle «untile» (прижато влево + `Super+Left`) никогда не срабатывает — попеременность лево/право сохраняется.
 
 Окно остаётся на своём мониторе, не переезжает на другой.
 
@@ -101,6 +105,7 @@ export default class MyExtension extends Extension {
 - `Main.wm.addKeybinding(name, settings, flags, modes, handler)` — стандартный путь регистрации хоткея. **Порядок аргументов: `(name, settings, flags, modes, handler)`** — `modes` перед `handler`.
 - `this.getSettings()` — настройки из `schemas/` директории расширения. Бросает, если схема не найдена.
 - `global.display`, `global.workspace_manager`, `global.stage` — по-прежнему доступны.
+- Инъекция клавиш: `global.stage.context.get_backend().get_default_seat().create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE)` → `device.notify_key(time_us, evdev_keycode, Clutter.KeyState.PRESSED|RELEASED)` (см. вывод #10).
 
 ## Хоткеи (GSettings)
 
@@ -110,7 +115,7 @@ export default class MyExtension extends Extension {
 
 Одна привязка, одна функция-обработчик. Логика выбора стороны — внутри, как описано в «Поведение».
 
-Хоткей регистрируется через `Main.wm.addKeybinding` с `Meta.KeyBindingFlags.IGNORE_AUTOREPEAT` и `Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW`.
+Хоткей регистрируется через `Main.wm.addKeybinding` с `Meta.KeyBindingFlags.IGNORE_AUTOREPEAT` и `Shell.ActionMode.NORMAL`. **Не `NORMAL | OVERVIEW`**: в OVERVIEW шелл фильтрует builtin-биндинги (`windowManager.js::_filterKeybinding`), и инжектированные `Super+Left/Right` там будут проглочены; снап в overview бессмыслен.
 
 ## Стиль кода
 
@@ -123,19 +128,25 @@ export default class MyExtension extends Extension {
 
 Автотестов нет. Ручной чек-лист (вписать результат в коммит/PR):
 
-1. Открыть окно в центре экрана → `<Super>Left` → прижато к левой половине, высота = полная высота монитора (панель рисуется поверх), WM-флаг `MAXIMIZED_VERTICALLY` выставлен.
-7. После `<Super>Left` нажать свой `Super+H` → окно возвращается к предыдущему не-максимизированному состоянию (вертикальная максимизация снимается, горизонтальное прижатие сохраняется).
-2. Повторно `<Super>Left` → прижато к правой половине.
-3. Сдвинуть окно чуть-чуть (не прижато) → `<Super>Left` → снова левая половина.
-4. На втором мониторе: окно переезжает по логике только в пределах своего монитора.
-5. Полноэкранное/диалоговое окно: хоткей игнорируется.
-6. После выхода из suspend / смены мониторов — хоткей работает без рестарта.
+1. Открыть окно в центре экрана → хоткей (`Super+W`) → прижато к **левой** половине, высота = полная высота монитора (панель рисуется поверх), WM-флаг `MAXIMIZED_VERTICALLY` выставлен, tile-статус LEFT (снап-анимация).
+2. Повторно `Super+W` → прижато к **правой** половине (tile RIGHT).
+3. Ещё раз → снова левая. Попеременность работает.
+4. **Пара (главный кейс):** окно A → хоткей (левая половина); окно B → хоткей (правая половина). Потянуть правый край A → **B автоматически меняет размер** (нативная tile-пара, `tile_match`). Ширины в сумме = `workArea.width`.
+5. Закрыть A → B остаётся прижатым к правой половине, пара распалась сама.
+6. Сдвинуть окно чуть-чуть (не прижато) → хоткей → снова левая половина.
+7. На втором мониторе: окно снэпается только в пределах своего монитора.
+8. Полноэкранное/диалоговое окно: хоткей игнорируется.
+9. После выхода из suspend / смены мониторов — хоткей работает без рестарта.
+10. Если `create_virtual_device` недоступен (например X11-бэкенд): хоткей не бросает исключений — `_createVirtualKeyboard()`/`_sendKey()` делают graceful no-op.
 
 ## Что НЕ делать
 
 - Не привязывать хоткеи без `GSettings` (хардкод запрещён).
 - Не использовать `global.window_manager` напрямую — устарело.
-- Не вызывать `window.maximize()`/`window.unmaximize()` — ломает логику «не прижат → прижать» (выставляют/снимают BOTH = fullscreen). Допустим только `set_maximize_flags(Meta.MaximizeFlags.VERTICAL)` после `move_resize_frame`.
+- Не снэпать вручную через `move_resize_frame` + `set_maximize_flags(VERTICAL)` — так получается «окно просто занимает половину экрана» без tile-статуса: нет снап-анимации, edge-constraints и **пары** (ресайз одного окна не тянет второе). Единственный путь к нативному поведению — нативный tile через инъекцию `Super+Left/Right`.
+- Не инжектить стрелку в том же направлении, в котором окно уже прижато: `toggle-tiled-*` — это toggle, повтор того же направления даст «untile». Направление всегда противоположное текущей позиции.
+- Не забывать отпускать Super: последовательность press/release должна быть парной (Super down → стрелка down → стрелка up → Super up), иначе модификатор залипнет.
+- Не вызывать `window.maximize()`/`window.unmaximize()` (выставляют/снимают BOTH = fullscreen).
 - Не ресайзить, если окно в состоянии fullscreen (`Meta.WindowType.NORMAL` фильтра недостаточно — проверять `window.is_fullscreen()` отдельно).
 
 ## Полученные выводы
@@ -271,6 +282,19 @@ getSettings(schema) {
 **Доказательство:** работающее расширение `putWindow@clemens.lab21.org` (совместимо с shell-version 49/50) использует `win.move_resize_frame(false, x, y, w, h)`.
 
 **Вывод:** `(is_user_action, x, y, w, h)`. Первый аргумент — `false` (не user-action). Для совместимости с Mutter 18 — никакого `Meta.GrabOp` не нужно передавать.
+
+### 10. Нативные хоткеи можно триггерить виртуальной клавиатурой (`Clutter.VirtualInputDevice.notify_key`)
+
+**Гипотеза:** «послать» `Super+Left` из GJS нельзя — синтезированные клавиши не дойдут до обработчика хоткеев мутера.
+
+**Проверка:** работает. GNOME Shell сам так делает в экранной клавиатуре (`js/ui/keyboard.js`, класс `KeyboardController`): `seat.create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE)` → `device.notify_keyval(...)`. Для хоткеев нужен именно **`notify_key`** (по keycode), потому что `meta_keybindings_process_event` матчит хоткеи по **keycode + модификаторам**, а не по keyval.
+
+**Доказательство (mutter 50.4):**
+- `meta_virtual_input_device_native_notify_key` → `meta_seat_impl_notify_key_in_impl` → `_clutter_event_push` → stage-filter → `meta_display_handle_event` → `meta_keybindings_process_event` (keybindings.c:263, events.c:262).
+- События пользовательской виртуальной клавиатуры **не** помечаются `CLUTTER_EVENT_FLAG_SYNTHETIC` — флаг ставится только внутренней `virtual_source_pointer` (meta-seat-impl.c:978-980), а `meta_wayland_keyboard_handle_event` отбрасывает только SYNTHETIC (wayland-kb.c:624-628) — значит, события доходят до биндингов.
+- `notify_key` принимает **evdev-код** (конвертируется в xkb keycode через `meta_xkb_evdev_to_keycode`); хоткеи матчатся по xkb keycode (keybindings.c).
+
+**Вывод:** для инъекции хоткея: Super down → стрелка down → стрелка up → Super up через `notify_key(time_us, evdev_code, KeyState)`. evdev-коды стабильны (ABI `input-event-codes.h`): `KEY_LEFT=105`, `KEY_RIGHT=106`, `KEY_LEFTMETA=125`. Инжектированный `Super+Left/Right` доходит до нативного `toggle-tiled-left/right` → `meta_window_tile` → настоящий tile-статус и **пара** (`tile_match`). Ограничение: `create_virtual_device` — native (Wayland) бэкенд; на X11 виртуальная клавиатура может не создаться.
 
 ### Сводка эмпирически подтверждённых методов `Meta.Window`
 
