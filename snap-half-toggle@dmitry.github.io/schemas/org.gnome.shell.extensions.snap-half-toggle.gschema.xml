@@ -6,5 +6,10 @@
       <summary>Toggle snap to half</summary>
       <description>Snap the focused window to the left or right half of its monitor. Pressing again on a left-snapped window snaps it to the right; otherwise snaps to the left.</description>
     </key>
+    <key type="as" name="toggle-thirds">
+      <default><![CDATA[['<Super><Shift>w']]]></default>
+      <summary>Cycle window across screen thirds</summary>
+      <description>Cycle the focused window across the left, middle and right thirds of its monitor, maximizing vertically. Pressing again moves it to the next third.</description>
+    </key>
   </schema>
 </schemalist>

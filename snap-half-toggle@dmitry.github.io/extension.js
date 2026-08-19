@@ -6,6 +6,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const KEY = 'toggle-snap';
+const KEY_THIRDS = 'toggle-thirds';
 const THRESHOLD = 5;
 
 const KEY_LEFT = 105;
@@ -22,11 +23,18 @@ export default class SnapHalfToggleExtension extends Extension {
             Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL,
             () => this._toggle());
+        Main.wm.addKeybinding(
+            KEY_THIRDS,
+            this._settings,
+            Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+            Shell.ActionMode.NORMAL,
+            () => this._toggleThirds());
     }
 
     disable() {
         if (this._settings) {
             Main.wm.removeKeybinding(KEY);
+            Main.wm.removeKeybinding(KEY_THIRDS);
             this._settings = null;
         }
         if (this._virtualDevice) {
@@ -85,5 +93,29 @@ export default class SnapHalfToggleExtension extends Extension {
 
         const atLeft = Math.abs(frame.x - work.x) <= THRESHOLD;
         this._pressSuperArrow(atLeft ? KEY_RIGHT : KEY_LEFT);
+    }
+
+    _toggleThirds() {
+        const win = this._pickWindow();
+        if (!win) return;
+
+        const monitorIdx = win.get_monitor();
+        const work = win.get_work_area_for_monitor(monitorIdx);
+        const frame = win.get_frame_rect();
+
+        const thirdW = Math.floor(work.width / 3);
+        const slots = [work.x, work.x + thirdW, work.x + 2 * thirdW];
+
+        let slot = 0;
+        for (let i = 0; i < slots.length; i++) {
+            if (Math.abs(frame.x - slots[i]) <= THRESHOLD) {
+                slot = (i + 1) % slots.length;
+                break;
+            }
+        }
+
+        win.move_resize_frame(false, slots[slot], work.y, thirdW, work.height);
+        win.set_unmaximize_flags(Meta.MaximizeFlags.HORIZONTAL);
+        win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
     }
 }
