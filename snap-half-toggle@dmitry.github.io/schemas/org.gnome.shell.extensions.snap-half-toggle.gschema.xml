@@ -11,5 +11,10 @@
       <summary>Cycle window across screen thirds</summary>
       <description>Cycle the focused window across the left, middle and right thirds of its monitor, maximizing vertically. Pressing again moves it to the next third.</description>
     </key>
+    <key type="as" name="toggle-quarters">
+      <default><![CDATA[['<Super><Shift><Ctrl>w']]]></default>
+      <summary>Cycle window across screen quarter columns</summary>
+      <description>Cycle the focused window across the four quarter-width columns of its monitor, maximizing vertically. Pressing again moves it to the next column.</description>
+    </key>
   </schema>
 </schemalist>

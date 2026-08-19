@@ -7,6 +7,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const KEY = 'toggle-snap';
 const KEY_THIRDS = 'toggle-thirds';
+const KEY_QUARTERS = 'toggle-quarters';
 const THRESHOLD = 5;
 
 const KEY_LEFT = 105;
@@ -29,12 +30,19 @@ export default class SnapHalfToggleExtension extends Extension {
             Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL,
             () => this._toggleThirds());
+        Main.wm.addKeybinding(
+            KEY_QUARTERS,
+            this._settings,
+            Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+            Shell.ActionMode.NORMAL,
+            () => this._toggleQuarters());
     }
 
     disable() {
         if (this._settings) {
             Main.wm.removeKeybinding(KEY);
             Main.wm.removeKeybinding(KEY_THIRDS);
+            Main.wm.removeKeybinding(KEY_QUARTERS);
             this._settings = null;
         }
         if (this._virtualDevice) {
@@ -115,6 +123,35 @@ export default class SnapHalfToggleExtension extends Extension {
         }
 
         win.move_resize_frame(false, slots[slot], work.y, thirdW, work.height);
+        win.set_unmaximize_flags(Meta.MaximizeFlags.HORIZONTAL);
+        win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
+    }
+
+    _toggleQuarters() {
+        const win = this._pickWindow();
+        if (!win) return;
+
+        const monitorIdx = win.get_monitor();
+        const work = win.get_work_area_for_monitor(monitorIdx);
+        const frame = win.get_frame_rect();
+
+        const quarterW = Math.floor(work.width / 4);
+        const slots = [
+            work.x,
+            work.x + quarterW,
+            work.x + 2 * quarterW,
+            work.x + 3 * quarterW,
+        ];
+
+        let slot = 0;
+        for (let i = 0; i < slots.length; i++) {
+            if (Math.abs(frame.x - slots[i]) <= THRESHOLD) {
+                slot = (i + 1) % slots.length;
+                break;
+            }
+        }
+
+        win.move_resize_frame(false, slots[slot], work.y, quarterW, work.height);
         win.set_unmaximize_flags(Meta.MaximizeFlags.HORIZONTAL);
         win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
     }

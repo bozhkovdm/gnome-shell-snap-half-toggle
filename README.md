@@ -24,6 +24,7 @@ Ignored windows: anything without focus, fullscreen windows, dialogs/modals, min
 |---|---|
 | `toggle-snap` | default: `<Super>w` |
 | `toggle-thirds` | default: `<Super><Shift>w` — cycles the focused window across the left, middle and right thirds of its monitor |
+| `toggle-quarters` | default: `<Super><Shift><Ctrl>w` — cycles the focused window across the four quarter-width columns of its monitor |
 
 Configurable through `Gio.Settings` (no hardcoded hotkeys). Change it with `gnome-extensions prefs snap-half-toggle@dmitry.github.io` or:
 
