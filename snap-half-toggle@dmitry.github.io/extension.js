@@ -8,6 +8,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 const KEY = 'toggle-snap';
 const KEY_THIRDS = 'toggle-thirds';
 const KEY_QUARTERS = 'toggle-quarters';
+const KEY_QUARTER_COLUMNS = 'toggle-quarter-columns';
 const THRESHOLD = 5;
 
 const KEY_LEFT = 105;
@@ -36,6 +37,12 @@ export default class SnapHalfToggleExtension extends Extension {
             Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL,
             () => this._toggleQuarters());
+        Main.wm.addKeybinding(
+            KEY_QUARTER_COLUMNS,
+            this._settings,
+            Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+            Shell.ActionMode.NORMAL,
+            () => this._toggleQuarterColumns());
     }
 
     disable() {
@@ -43,6 +50,7 @@ export default class SnapHalfToggleExtension extends Extension {
             Main.wm.removeKeybinding(KEY);
             Main.wm.removeKeybinding(KEY_THIRDS);
             Main.wm.removeKeybinding(KEY_QUARTERS);
+            Main.wm.removeKeybinding(KEY_QUARTER_COLUMNS);
             this._settings = null;
         }
         if (this._virtualDevice) {
@@ -127,7 +135,7 @@ export default class SnapHalfToggleExtension extends Extension {
         win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
     }
 
-    _toggleQuarters() {
+    _toggleQuarterColumns() {
         const win = this._pickWindow();
         if (!win) return;
 
@@ -154,5 +162,42 @@ export default class SnapHalfToggleExtension extends Extension {
         win.move_resize_frame(false, slots[slot], work.y, quarterW, work.height);
         win.set_unmaximize_flags(Meta.MaximizeFlags.HORIZONTAL);
         win.set_maximize_flags(Meta.MaximizeFlags.VERTICAL);
+    }
+
+    _toggleQuarters() {
+        const win = this._pickWindow();
+        if (!win) return;
+
+        const monitorIdx = win.get_monitor();
+        const work = win.get_work_area_for_monitor(monitorIdx);
+        const frame = win.get_frame_rect();
+
+        const halfW = Math.floor(work.width / 2);
+        const halfH = Math.floor(work.height / 2);
+        const rightW = work.width - halfW;
+        const bottomH = work.height - halfH;
+        const rects = [
+            {x: work.x, y: work.y, width: halfW, height: halfH},
+            {x: work.x + halfW, y: work.y, width: rightW, height: halfH},
+            {x: work.x + halfW, y: work.y + halfH, width: rightW, height: bottomH},
+            {x: work.x, y: work.y + halfH, width: halfW, height: bottomH},
+        ];
+
+        let next = 0;
+        for (let i = 0; i < rects.length; i++) {
+            const r = rects[i];
+            if (Math.abs(frame.x - r.x) <= THRESHOLD &&
+                Math.abs(frame.y - r.y) <= THRESHOLD &&
+                Math.abs(frame.width - r.width) <= THRESHOLD &&
+                Math.abs(frame.height - r.height) <= THRESHOLD) {
+                next = (i + 1) % rects.length;
+                break;
+            }
+        }
+
+        const r = rects[next];
+        win.set_unmaximize_flags(
+            Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL);
+        win.move_resize_frame(false, r.x, r.y, r.width, r.height);
     }
 }

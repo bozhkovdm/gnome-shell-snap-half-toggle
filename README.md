@@ -22,9 +22,12 @@ Ignored windows: anything without focus, fullscreen windows, dialogs/modals, min
 
 | Key | Setting |
 |---|---|
-| `toggle-snap` | default: `<Super>w` |
+| `toggle-snap` | default: `<Super>w` — snaps to left/right half |
 | `toggle-thirds` | default: `<Super><Shift>w` — cycles the focused window across the left, middle and right thirds of its monitor |
-| `toggle-quarters` | default: `<Super><Shift><Ctrl>w` — cycles the focused window across the four quarter-width columns of its monitor |
+| `toggle-quarter-columns` | default: `<Super><Shift><Ctrl>w` — cycles the focused window across the four quarter-width columns of its monitor |
+| `toggle-quarters` | default: `<Super><Alt>w` — cycles the focused window across the four quarters (2×2) of its monitor clockwise: top-left → top-right → bottom-right → bottom-left |
+
+Quarter-grid placement is manual (`move_resize_frame` + unmaximize both axes), because Mutter has no native quarter tiling: there is no snap animation and no native tile pair. If the window is not already in a quarter, the first press moves it to the top-left quarter.
 
 Configurable through `Gio.Settings` (no hardcoded hotkeys). Change it with `gnome-extensions prefs snap-half-toggle@dmitry.github.io` or:
 

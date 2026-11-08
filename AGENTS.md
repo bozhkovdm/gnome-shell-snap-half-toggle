@@ -111,9 +111,14 @@ export default class MyExtension extends Extension {
 
 Схема `org.gnome.shell.extensions.snap-half-toggle`:
 
-- `toggle-snap` — переключатель. Дефолт: `<Super>w`.
+- `toggle-snap` — половины, нативный tile. Дефолт: `<Super>w`.
+- `toggle-thirds` — трети по ширине × полная высота. Дефолт: `<Super><Shift>w`.
+- `toggle-quarter-columns` — четверти по ширине × полная высота. Дефолт: `<Super><Shift><Ctrl>w`.
+- `toggle-quarters` — сетка 2×2 по часовой стрелке: TL → TR → BR → BL, при старте вне четверти — TL. Дефолт: `<Super><Alt>w`.
 
-Одна привязка, одна функция-обработчик. Логика выбора стороны — внутри, как описано в «Поведение».
+Каждая привязка — один обработчик. Логика выбора стороны/позиции — внутри, как описано в «Поведение».
+
+Трети, колонки и сетка 2×2 позиционируются вручную (`move_resize_frame`), потому что нативного tile для них в Mutter нет. У сетки 2×2 дополнительно снимается максимизация по обеим осям (`set_unmaximize_flags(HORIZONTAL | VERTICAL)`), иначе окно, прижатое в половину, не займёт четверть по высоте. Нативная пара (`tile_match`) образуется только у половин.
 
 Хоткей регистрируется через `Main.wm.addKeybinding` с `Meta.KeyBindingFlags.IGNORE_AUTOREPEAT` и `Shell.ActionMode.NORMAL`. **Не `NORMAL | OVERVIEW`**: в OVERVIEW шелл фильтрует builtin-биндинги (`windowManager.js::_filterKeybinding`), и инжектированные `Super+Left/Right` там будут проглочены; снап в overview бессмыслен.
 
@@ -143,7 +148,7 @@ export default class MyExtension extends Extension {
 
 - Не привязывать хоткеи без `GSettings` (хардкод запрещён).
 - Не использовать `global.window_manager` напрямую — устарело.
-- Не снэпать вручную через `move_resize_frame` + `set_maximize_flags(VERTICAL)` — так получается «окно просто занимает половину экрана» без tile-статуса: нет снап-анимации, edge-constraints и **пары** (ресайз одного окна не тянет второе). Единственный путь к нативному поведению — нативный tile через инъекцию `Super+Left/Right`.
+- Не снэпать вручную половины через `move_resize_frame` + `set_maximize_flags(VERTICAL)` — так получается «окно просто занимает половину экрана» без tile-статуса: нет снап-анимации, edge-constraints и **пары** (ресайз одного окна не тянет второе). Единственный путь к нативному поведению половины — нативный tile через инъекцию `Super+Left/Right`. Для третей, колонок и сетки 2×2 нативного tile в Mutter нет — там ручное позиционирование единственный вариант.
 - Не инжектить стрелку в том же направлении, в котором окно уже прижато: `toggle-tiled-*` — это toggle, повтор того же направления даст «untile». Направление всегда противоположное текущей позиции.
 - Не забывать отпускать Super: последовательность press/release должна быть парной (Super down → стрелка down → стрелка up → Super up), иначе модификатор залипнет.
 - Не вызывать `window.maximize()`/`window.unmaximize()` (выставляют/снимают BOTH = fullscreen).
